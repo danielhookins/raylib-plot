@@ -14,3 +14,7 @@ clang -o bin/app src/main.c -I/opt/homebrew/Cellar/raylib/4.5.0/include/ -L/opt/
 ```
 ./bin/app
 ```
+
+## Usage
+
+Drag a csv file on to the window (see the example) to plot the data.
