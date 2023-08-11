@@ -13,9 +13,12 @@ This repository contains a simple C program that uses the [raylib](https://www.r
 
 - **CSV Loading**: The program can load points from a CSV file with the format:
   ```
-  x,y
-  30,50
-  40,75
+  time,x,y,z
+  2023-08-09 23:33:20T+09:30,10,100,200,300,400
+  2023-08-09 23:34:20T+09:30,15,150,250,350,450
+  2023-08-09 23:35:20T+09:30,22,200,300,400,500
+  2023-08-09 23:36:20T+09:30,15,150,250,350,450
+  2023-08-09 23:37:20T+09:30,22,200,300,400,500
   ...
   ```
 - **Interactive Plotting**: Drop a CSV file onto the window to plot the points.
