@@ -2,27 +2,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h> // Include this for INFINITY
 
-/**
- * @struct Point
- * @brief Represents a 2D point with x as timestamp and y-values.
- */
 typedef struct {
     char x[25];
     float* y_values;
     int y_count;
 } Point;
 
-// Global variables to store the points and their count
 Point* points = NULL;
 int pointsCount = 0;
+
+int getAxisIncrement(float range) {
+    if (range <= 10) return 1;
+    else if (range <= 100) return 5;
+    else if (range <= 500) return 50;
+    else return 100; // default increment for very large ranges
+}
 
 /**
  * @brief Loads data from a CSV file into the points array.
  * 
  * @param filename Name of the CSV file to load.
  */
-void LoadCSVData(const char* filename) {
+void LoadCSVData(const char* filename, float* maxYValue, float* minYValue) {
     FILE* file = fopen(filename, "r");
     if (!file) {
         perror("Failed to open file");
@@ -71,6 +74,21 @@ void LoadCSVData(const char* filename) {
     }
     printf("Finished loading CSV data. Total points: %d\n", pointsCount);
     fclose(file);
+
+    // Calculate maxYValue and minYValue after loading the data
+    *maxYValue = -INFINITY;
+    *minYValue = INFINITY;
+    for (int i = 0; i < pointsCount; i++) {
+        for (int j = 0; j < points[i].y_count; j++) {
+            if (points[i].y_values[j] > *maxYValue) *maxYValue = points[i].y_values[j];
+            if (points[i].y_values[j] < *minYValue) *minYValue = points[i].y_values[j];
+        }
+    }
+
+    // Adjust minYValue to be 0 if it's greater than 0
+    if (*minYValue > 0) {
+        *minYValue = 0;
+    }
 }
 
 void ClearPreviousData() {
@@ -87,69 +105,70 @@ int main(void) {
     const int screenWidth = 800;
     const int screenHeight = 450;
     const Color colors[] = {DARKBLUE, RED, GREEN, YELLOW, PURPLE, ORANGE, PINK, LIME, GOLD, DARKBROWN};
-    const int LABEL_SKIP = 1; // Display every label
+    const int LABEL_SKIP = 1;
 
-    // Initialize raylib window
     InitWindow(screenWidth, screenHeight, "raylib CSV scatter plot");
     SetTargetFPS(60);
 
-    while (!WindowShouldClose()) {
-        // Check for file drop and load data
-        if (IsFileDropped()) {
-            printf("File drop detected.\n");
+    float maxYValue = -INFINITY;
+    float minYValue = INFINITY;
 
-            ClearPreviousData(); // Clear any previously loaded data
+    while (!WindowShouldClose()) {
+        if (IsFileDropped()) {
+            ClearPreviousData();
 
             FilePathList droppedFilesList = LoadDroppedFiles();
             if (droppedFilesList.count > 0) {
-                printf("Loading file: %s\n", droppedFilesList.paths[0]);
-                LoadCSVData(droppedFilesList.paths[0]);
+                LoadCSVData(droppedFilesList.paths[0], &maxYValue, &minYValue);
             }
         }
 
-        const int offset = 30; // Offset from the bottom for drawing
+        const int offset = 30;
+        float scale = (screenHeight - 2 * offset) / (maxYValue - minYValue); // Define the scale here
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
 
-        printf("Starting to draw scatter plot points...\n");
-        // Draw the scatter plot points
+        float xSpacing = (float)screenWidth / (pointsCount + 1); // Calculate spacing based on number of data points
+
+        // Draw the scatter plot points with adjusted x-axis scaling
         for (int i = 0; i < pointsCount; i++) {
             for (int j = 0; j < points[i].y_count; j++) {
                 Color pointColor = colors[j % (sizeof(colors) / sizeof(colors[0]))];
-                DrawCircle((i + 1) * 100, screenHeight - points[i].y_values[j] - offset, 5, pointColor);
+                float scaledY = screenHeight - offset - (points[i].y_values[j] - minYValue) * scale;
+                DrawCircle((i + 1) * xSpacing, scaledY, 5, pointColor);
             }
         }
-        printf("Finished drawing scatter plot points.\n");
 
-        printf("Starting to draw x-axis labels...\n");
-        // Draw x-axis labels with timestamps
+        // Draw x-axis labels with timestamps using adjusted x-axis scaling
         for (int i = 0; i < pointsCount; i += LABEL_SKIP) {
-            Vector2 position = {(i + 1) * 100, screenHeight - offset + 10};
+            Vector2 position = {(i + 1) * xSpacing, screenHeight - offset + 10};
             DrawTextEx(GetFontDefault(), points[i].x, position, 10, 1, GRAY);
         }
-        printf("Finished drawing x-axis labels.\n");
 
-        // Draw x and y axes
         DrawLine(0, screenHeight - offset, screenWidth, screenHeight - offset, GRAY);
         DrawLine(0, 0, 0, screenHeight - offset, GRAY);
 
-        // Define scale parameters
         int maxY = 450;
         int interval = 50;
 
-        // Draw y-axis scale
-        for (int i = 0; i <= maxY; i += interval) {
-            DrawLine(-5, screenHeight - i - offset, 5, screenHeight - i - offset, GRAY);
-            DrawText(TextFormat("%d", i), 10, screenHeight - i - offset - 5, 10, GRAY);
+        // Adjusted y-axis scale
+        if (pointsCount > 0) { // Only draw y-axis labels if data points have been loaded
+            float range = maxYValue - minYValue;
+            int yAxisIncrement = getAxisIncrement(range);
+            int numLabels = range / yAxisIncrement;
+            for (int i = 0; i <= numLabels; i++) {
+                float value = minYValue + i * yAxisIncrement;
+                float yPosition = screenHeight - offset - (value - minYValue) * scale;
+                DrawLine(0, yPosition, screenWidth, yPosition, LIGHTGRAY); // Draw horizontal lines across the graph
+                DrawLine(-5, yPosition, 5, yPosition, GRAY);
+                DrawText(TextFormat("%.2f", value), 10, yPosition - 5, 10, GRAY);
+            }
         }
-
-        printf("Rendering frame...\n");
 
         EndDrawing();
     }
 
-    // Cleanup
     ClearPreviousData();
     CloseWindow();
 
